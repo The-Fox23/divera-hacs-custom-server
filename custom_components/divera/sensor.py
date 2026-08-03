@@ -25,6 +25,14 @@ def _fmt_ts(unix: int | None) -> str | None:
         return str(unix)
 
 
+def _resolve_groups(group_ids: list | None, group_map: dict) -> str | None:
+    """Gruppen-IDs anhand der Cluster-Gruppen-Zuordnung in Namen auflösen."""
+    if not group_ids:
+        return None
+    names = [group_map.get(str(gid), {}).get("name", str(gid)) for gid in group_ids]
+    return ", ".join(names)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -52,16 +60,18 @@ class DiveraSensor(CoordinatorEntity[DiveraCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> str:
-        alarm = self.coordinator.data
+        alarm = (self.coordinator.data or {}).get("alarm")
         if alarm is None:
             return NO_ALARM_STATE
         return alarm.get("title") or NO_ALARM_STATE
 
     @property
     def extra_state_attributes(self) -> dict:
-        alarm = self.coordinator.data
+        data = self.coordinator.data or {}
+        alarm = data.get("alarm")
         if alarm is None:
             return {}
+        groups = data.get("groups", {})
 
         # Gesamten API-Response als Attribute, bekannte Felder mit deutschen Namen
         attrs: dict = {}
@@ -77,9 +87,10 @@ class DiveraSensor(CoordinatorEntity[DiveraCoordinator], SensorEntity):
         attrs["latitude"]     = alarm.get("lat")
         attrs["longitude"]    = alarm.get("lng")
         attrs["fahrzeuge"]    = alarm.get("vehicles")
+        attrs["group"]        = _resolve_groups(alarm.get("group"), groups)
 
         # Alle restlichen API-Felder direkt übernehmen
-        bekannte = {"title", "text", "address", "id", "priority", "closed", "date", "lat", "lng", "vehicles"}
+        bekannte = {"title", "text", "address", "id", "priority", "closed", "date", "lat", "lng", "vehicles", "group"}
         for key, value in alarm.items():
             if key not in bekannte:
                 attrs[key] = value
