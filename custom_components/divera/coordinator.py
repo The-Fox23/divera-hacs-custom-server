@@ -129,7 +129,10 @@ class DiveraCoordinator(DataUpdateCoordinator):
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Verbindungsfehler: {err}") from err
 
-        return self._extract_alarm(payload)
+        return {
+            "alarm": self._extract_alarm(payload),
+            "groups": payload.get("data", {}).get("cluster", {}).get("group", {}),
+        }
 
     def _extract_alarm(self, payload: dict):
         """Neuesten aktiven Alarm aus der API-Antwort extrahieren."""
