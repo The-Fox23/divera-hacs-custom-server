@@ -33,6 +33,135 @@ class DiveraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._access_key: str = ""
         self._ucr_options: dict[str, str] = {}
 
+        async def async_step_reconfigure(
+        self,
+        user_input=None,
+    ) -> FlowResult:
+        """Bestehende DIVERA-Konfiguration ändern."""
+        entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            base_url = user_input[CONF_BASE_URL].strip().rstrip("/")
+            access_key = user_input[CONF_ACCESS_KEY].strip()
+
+            if not self._valid_base_url(base_url):
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(
+                                CONF_BASE_URL,
+                                default=base_url,
+                            ): str,
+                            vol.Required(
+                                CONF_ACCESS_KEY,
+                                default=access_key,
+                            ): str,
+                        }
+                    ),
+                    errors={
+                        CONF_BASE_URL: "invalid_url",
+                    },
+                )
+
+            if not access_key:
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(
+                                CONF_BASE_URL,
+                                default=base_url,
+                            ): str,
+                            vol.Required(
+                                CONF_ACCESS_KEY,
+                            ): str,
+                        }
+                    ),
+                    errors={
+                        CONF_ACCESS_KEY: "invalid_auth",
+                    },
+                )
+
+            ucr_options, error = await self._fetch_ucr(
+                base_url,
+                access_key,
+            )
+
+            if error:
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(
+                                CONF_BASE_URL,
+                                default=base_url,
+                            ): str,
+                            vol.Required(
+                                CONF_ACCESS_KEY,
+                            ): str,
+                        }
+                    ),
+                    errors={
+                        "base": error,
+                    },
+                )
+
+            current_ucr_id = entry.data.get(CONF_UCR_ID)
+
+            if (
+                current_ucr_id
+                and str(current_ucr_id) not in ucr_options
+            ):
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(
+                                CONF_BASE_URL,
+                                default=base_url,
+                            ): str,
+                            vol.Required(
+                                CONF_ACCESS_KEY,
+                            ): str,
+                        }
+                    ),
+                    errors={
+                        "base": "unit_not_found",
+                    },
+                )
+
+            return self.async_update_reload_and_abort(
+                entry,
+                data_updates={
+                    CONF_BASE_URL: base_url,
+                    CONF_ACCESS_KEY: access_key,
+                },
+            )
+
+        current_base_url = entry.data.get(
+            CONF_BASE_URL,
+            DEFAULT_BASE_URL,
+        )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_BASE_URL,
+                        default=current_base_url,
+                    ): str,
+                    vol.Required(
+                        CONF_ACCESS_KEY,
+                        default=entry.data.get(
+                            CONF_ACCESS_KEY,
+                            "",
+                        ),
+                    ): str,
+                }
+            ),
+        )
     async def async_step_user(self, user_input=None) -> FlowResult:
         """Step 1: collect server URL and access key."""
         errors: dict[str, str] = {}
