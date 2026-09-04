@@ -1,4 +1,4 @@
-# DIVERA 24/7 – Home Assistant Integration
+# DIVERA 24/7 – Home Assistant Integration with Divera Server URL
 
 [![Buy me a Beer](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20Beer&emoji=🍺&slug=lassefactory&button_colour=FFDD00&font_colour=000000&font_family=Comic&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/lassefactory)
 
