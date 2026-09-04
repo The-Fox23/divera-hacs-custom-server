@@ -38,7 +38,7 @@ class DiveraCoordinator(DataUpdateCoordinator):
     """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self.base_url: str = entry.data.get(CONF_BASE_URL,DEFAULT_BASE_URL,).rstrip("/")
+        self.base_url: str = entry.data[CONF_BASE_URL].rstrip("/")
         self.access_key: str = entry.data[CONF_ACCESS_KEY]
         self.ucr_id: str | None = entry.data.get(CONF_UCR_ID)
 
