@@ -27,7 +27,7 @@ Die Integration verbindet sich dauerhaft per **WebSocket** mit den DIVERA-Server
 1. HACS in Home Assistant öffnen
 2. Oben rechts auf die **drei Punkte** klicken → **Benutzerdefinierte Repositories**
 3. Folgendes eintragen:
-   - **Repository:** `https://github.com/lassefactory/divera-hacs`
+   - **Repository:** `https://github.com/The-Fox23/divera-hacs-2026`
    - **Kategorie:** Integration
 4. **Hinzufügen** klicken
 5. In HACS nach **DIVERA 24/7** suchen und **Herunterladen** klicken
