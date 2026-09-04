@@ -26,7 +26,7 @@ from .const import (
 class DiveraConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for DIVERA 24/7."""
 
-    VERSION = 2
+    VERSION = 3
 
     def __init__(self) -> None:
         self._base_url: str = DEFAULT_BASE_URL
