@@ -1,4 +1,4 @@
-"""DIVERA 24/7 sensor entity."""
+"""DIVERA 24/7 sensor entities."""
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +18,7 @@ NO_ALARM_STATE = "Kein aktiver Einsatz"
 
 
 def _fmt_ts(unix: int | None) -> str | None:
+    """Unix-Zeitstempel in ISO-Zeit umwandeln."""
     if unix is None:
         return None
 
@@ -30,16 +31,26 @@ def _fmt_ts(unix: int | None) -> str | None:
         return str(unix)
 
 
+def _get_server_hash(base_url: str) -> str:
+    """Eindeutigen Hash für den DIVERA Server erzeugen."""
+    return hashlib.sha1(
+        base_url.encode("utf-8")
+    ).hexdigest()[:8]
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Sensor für den konfigurierten DIVERA Server erstellen."""
+    """DIVERA Sensoren erstellen."""
     coordinator: DiveraCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
-        [DiveraSensor(coordinator, entry)]
+        [
+            DiveraSensor(coordinator, entry),
+            DiveraAlarmTextSensor(coordinator, entry),
+        ]
     )
 
 
@@ -71,11 +82,7 @@ class DiveraSensor(
             "",
         )
 
-        # Server-URL + UCR ergeben eine eindeutige ID.
-        server_hash = hashlib.sha1(
-            base_url.encode("utf-8")
-        ).hexdigest()[:8]
-
+        server_hash = _get_server_hash(base_url)
         unique_id = f"{server_hash}_{ucr_id}"
 
         self._attr_name = f"DIVERA {ucr_name}"
@@ -152,4 +159,87 @@ class DiveraSensor(
             key: value
             for key, value in attrs.items()
             if value is not None
+        }
+
+
+class DiveraAlarmTextSensor(
+    CoordinatorEntity[DiveraCoordinator],
+    SensorEntity,
+):
+    """Sensor für den Alarmtext."""
+
+    def __init__(
+        self,
+        coordinator: DiveraCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+
+        ucr_name: str = entry.data.get(
+            CONF_UCR_NAME,
+            "DIVERA",
+        )
+
+        ucr_id: str = entry.data.get(
+            CONF_UCR_ID,
+            entry.entry_id,
+        )
+
+        base_url: str = entry.data.get(
+            CONF_BASE_URL,
+            "",
+        )
+
+        server_hash = _get_server_hash(base_url)
+        unique_id = f"{server_hash}_{ucr_id}"
+
+        self._attr_name = f"DIVERA Alarmtext {ucr_name}"
+
+        self._attr_unique_id = (
+            f"divera_alarmtext_{unique_id}"
+        )
+
+        self._attr_device_info = DeviceInfo(
+            identifiers={
+                (DOMAIN, unique_id)
+            },
+            name=f"DIVERA 24/7 – {ucr_name}",
+            manufacturer="DIVERA GmbH",
+            model="DIVERA 24/7",
+        )
+
+    @property
+    def native_value(self) -> str:
+        """Alarmtext als Sensorwert zurückgeben."""
+        alarm = self.coordinator.data
+
+        if alarm is None:
+            return ""
+
+        text = alarm.get("text")
+
+        if text is None:
+            return ""
+
+        # Sensorzustände sollten nicht unnötig lang werden.
+        return str(text)[:255]
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Zusätzliche Informationen zum Alarmtext."""
+        alarm = self.coordinator.data
+
+        if alarm is None:
+            return {}
+
+        text = alarm.get("text")
+
+        if text is None:
+            return {}
+
+        return {
+            "volltext": str(text),
+            "stichwort": alarm.get("title"),
+            "adresse": alarm.get("address"),
+            "einsatz_id": alarm.get("id"),
         }
