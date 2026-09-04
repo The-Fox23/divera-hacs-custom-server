@@ -3,8 +3,9 @@
     "step": {
       "user": {
         "title": "DIVERA 24/7 einrichten",
-        "description": "Gib deinen DIVERA-API-Schlüssel ein. Du findest ihn in DIVERA unter Einstellungen → DEBUG → Accesskey.",
+        "description": "Gib die Server-URL und deinen DIVERA-API-Schlüssel ein. Bei einem eigenen DIVERA Server trägst du hier die Adresse deines Servers ein.",
         "data": {
+          "base_url": "Server-URL",
           "access_key": "API-Schlüssel"
         }
       },
@@ -18,7 +19,8 @@
     },
     "error": {
       "invalid_auth": "Ungültiger API-Schlüssel. Bitte prüfe den Schlüssel und versuche es erneut.",
-      "cannot_connect": "Verbindung zum DIVERA-Server fehlgeschlagen. Bitte prüfe deine Internetverbindung."
+      "invalid_url": "Ungültige Server-URL. Bitte gib eine vollständige URL mit http:// oder https:// ein.",
+      "cannot_connect": "Verbindung zum DIVERA-Server fehlgeschlagen. Bitte prüfe die Server-URL und die Verbindung."
     },
     "abort": {
       "already_configured": "Diese Einheit ist bereits konfiguriert.",
