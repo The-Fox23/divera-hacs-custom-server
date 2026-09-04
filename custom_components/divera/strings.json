@@ -9,6 +9,14 @@
           "access_key": "API-Schlüssel"
         }
       },
+      "reconfigure": {
+  "title": "DIVERA 24/7 konfigurieren",
+  "description": "Ändere hier die Server-URL oder den API-Schlüssel deines DIVERA Servers.",
+  "data": {
+    "base_url": "Server-URL",
+    "access_key": "API-Schlüssel"
+  }
+},
       "select_ucr": {
         "title": "Einheit auswählen",
         "description": "Wähle die Einheit aus, für die Alarme angezeigt werden sollen.",
