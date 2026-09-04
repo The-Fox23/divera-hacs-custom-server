@@ -15,7 +15,7 @@ Die Integration verbindet sich dauerhaft per **WebSocket** mit den DIVERA-Server
 ## Voraussetzungen
 
 - Home Assistant OS, Supervised oder Core
-- DIVERA 24/7 Account mit API-Zugang
+- DIVERA 24/7 Server Account mit API-Zugang
 - HACS installiert (für die empfohlene Installation)
 
 ---
@@ -30,7 +30,7 @@ Die Integration verbindet sich dauerhaft per **WebSocket** mit den DIVERA-Server
    - **Repository:** `https://github.com/The-Fox23/divera-hacs-2026`
    - **Kategorie:** Integration
 4. **Hinzufügen** klicken
-5. In HACS nach **DIVERA 24/7** suchen und **Herunterladen** klicken
+5. In HACS nach **DIVERA 24/7 with Server URL** suchen und **Herunterladen** klicken
 6. Home Assistant neu starten
 
 ---
