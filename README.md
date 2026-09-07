@@ -80,6 +80,7 @@ config/
 Nach der Einrichtung wird ein Sensor erstellt:
 
 **`sensor.divera_<einheitname>`**
+**`sensor.divera_<alarmtext>`**
 
 | | |
 |---|---|
@@ -102,29 +103,6 @@ Nach der Einrichtung wird ein Sensor erstellt:
 
 ---
 
-## Blueprint – Alarm-Automation
-
-Im Ordner `blueprints/` liegt ein fertiges Blueprint, mit dem du ganz einfach Automationen erstellen kannst.
-
-### Blueprint installieren
-
-[![Blueprint importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Flassefactory%2Fdivera-hacs%2Fmain%2Fblueprints%2Fdivera_alarm.yaml)
-
-Oder manuell: Datei `blueprints/divera_alarm.yaml` kopieren nach:
-```
-config/blueprints/automation/divera/divera_alarm.yaml
-```
-In HA: **Einstellungen → Automationen → Blueprints** – das Blueprint erscheint automatisch
-
-### Blueprint verwenden
-
-Das Blueprint bietet folgende Einstellungen:
-
-| Einstellung | Beschreibung |
-|---|---|
-| **DIVERA Sensor** | Auswahl des DIVERA-Sensors |
-| **Stichwörter filtern** | Kommagetrennte Stichwörter die NICHT auslösen sollen (z. B. `THL, Übung`) |
-| **Aktionen** | Frei definierbar – Benachrichtigung, Licht, TTS, etc. |
 
 ### Beispiel-Automation
 
