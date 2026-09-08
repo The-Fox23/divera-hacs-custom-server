@@ -81,6 +81,11 @@ Nach der Einrichtung wird ein Sensor erstellt:
 
 **`sensor.divera_<einheitname>`**
 **`sensor.divera_<alarmtext>`**
+**`sensor.divera_<alarmierte>`**
+**`sensor.divera_<alarmdatum>`**
+**`sensor.divera_<alarmid>`**
+**`sensor.divera_<alarmadresse>`**
+**`sensor.divera_<Position>`**
 
 | | |
 |---|---|
@@ -106,24 +111,20 @@ Nach der Einrichtung wird ein Sensor erstellt:
 
 ### Beispiel-Automation
 
-```yaml
-automation:
-  - alias: "DIVERA Alarm – Benachrichtigung"
-    use_blueprint:
-      path: divera/divera_alarm.yaml
-      input:
-        sensor_entity: sensor.divera_meine_einheit
-        filter_keywords: "THL, Übung, Feuer Klein"
-        actions:
-          - service: notify.mobile_app_mein_handy
-            data:
-              title: "Neuer Einsatz!"
-              message: >
-                {{ state_attr('sensor.divera_meine_einheit', 'stichwort') }}
-                – {{ state_attr('sensor.divera_meine_einheit', 'adresse') }}
+trigger:
+  - platform: state
+    entity_id: sensor.divera_alarmtext
+
+action:
+  - service: notify.mobile_app
+    data:
+      title: "{{ states('sensor.divera_alarm') }}"
+      message: >
+        {{ states('sensor.divera_alarmtext') }}
+        Einsatzort: {{ state_attr('sensor.divera_alarm',
+        'adresse') }}
 ```
 
----
 
 ## Debugging
 
