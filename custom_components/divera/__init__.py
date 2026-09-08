@@ -7,10 +7,13 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import DiveraCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "device_tracker"]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> bool:
     """Integration einrichten: initiale Daten laden + WebSocket starten."""
     coordinator = DiveraCoordinator(hass, entry)
 
@@ -20,8 +23,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Coordinator speichern, bevor Plattformen initialisiert werden
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    # Sensor-Plattform registrieren
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Sensor- und Device-Tracker-Plattform registrieren
+    await hass.config_entries.async_forward_entry_setups(
+        entry,
+        PLATFORMS,
+    )
 
     # WebSocket-Loop als Background-Task starten
     await coordinator.async_start_websocket()
@@ -29,13 +35,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> bool:
     """Integration entladen: WebSocket stoppen + Plattformen entladen."""
     coordinator: DiveraCoordinator = hass.data[DOMAIN].get(entry.entry_id)
+
     if coordinator:
         coordinator.async_stop_websocket()
 
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(
+        entry,
+        PLATFORMS,
+    )
+
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+
     return unload_ok
