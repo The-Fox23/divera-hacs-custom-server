@@ -4,10 +4,6 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from homeassistant.components.device_tracker import (
-    SourceType,
-    TrackerEntity,
-)
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -92,7 +88,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """DIVERA Sensoren und Einsatzort erstellen."""
+    """DIVERA Sensoren erstellen."""
     coordinator: DiveraCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
@@ -108,15 +104,6 @@ async def async_setup_entry(
             DiveraReportSensor(coordinator, entry),
             DiveraLatitudeSensor(coordinator, entry),
             DiveraLongitudeSensor(coordinator, entry),
-        ]
-    )
-
-    async_add_entities(
-        [
-            DiveraIncidentLocationTracker(
-                coordinator,
-                entry,
-            )
         ]
     )
 
@@ -139,9 +126,7 @@ class DiveraSensor(
         )
 
         self._attr_name = f"DIVERA {ucr_name}"
-
         self._attr_unique_id = sensor_id
-
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -294,6 +279,7 @@ class DiveraAddressSensor(
         )
 
         self._attr_unique_id = sensor_id
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -335,6 +321,7 @@ class DiveraAlarmIdSensor(
         )
 
         self._attr_unique_id = sensor_id
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -376,6 +363,7 @@ class DiveraAlarmTimeSensor(
         )
 
         self._attr_unique_id = sensor_id
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -417,6 +405,7 @@ class DiveraDurationSensor(
         )
 
         self._attr_unique_id = sensor_id
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -459,6 +448,7 @@ class DiveraRecipientsSensor(
 
         self._attr_unique_id = sensor_id
         self._attr_native_unit_of_measurement = "Personen"
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -501,6 +491,7 @@ class DiveraReadSensor(
 
         self._attr_unique_id = sensor_id
         self._attr_native_unit_of_measurement = "Personen"
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -542,6 +533,7 @@ class DiveraReportSensor(
         )
 
         self._attr_unique_id = sensor_id
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -584,6 +576,7 @@ class DiveraLatitudeSensor(
 
         self._attr_unique_id = sensor_id
         self._attr_native_unit_of_measurement = "°"
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -629,6 +622,7 @@ class DiveraLongitudeSensor(
 
         self._attr_unique_id = sensor_id
         self._attr_native_unit_of_measurement = "°"
+
         self._attr_device_info = _get_device_info(
             ucr_name,
             unique_id,
@@ -648,101 +642,3 @@ class DiveraLongitudeSensor(
             return float(value) if value is not None else None
         except (TypeError, ValueError):
             return None
-
-
-class DiveraIncidentLocationTracker(
-    CoordinatorEntity[DiveraCoordinator],
-    TrackerEntity,
-):
-    """Einsatzort als Kartenposition."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, tracker_id = _get_unique_id(
-            entry,
-            "einsatzort_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Einsatzort {ucr_name}"
-        )
-
-        self._attr_unique_id = tracker_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
-        self._attr_source_type = SourceType.GPS
-
-    @property
-    def latitude(self) -> float | None:
-        """Breitengrad des Einsatzortes."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return None
-
-        value = alarm.get("lat")
-
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
-    @property
-    def longitude(self) -> float | None:
-        """Längengrad des Einsatzortes."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return None
-
-        value = alarm.get("lng")
-
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
-    @property
-    def location_name(self) -> str | None:
-        """Adresse des Einsatzortes."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return None
-
-        address = alarm.get("address")
-
-        if address:
-            return str(address)
-
-        return "Einsatzort"
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Zusätzliche Einsatzinformationen."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return {}
-
-        return {
-            "einsatz_id": alarm.get("id"),
-            "stichwort": alarm.get("title"),
-            "beschreibung": alarm.get("text"),
-            "adresse": alarm.get("address"),
-            "prioritaet": alarm.get("priority"),
-            "alarmiert_am": _fmt_ts(
-                alarm.get("date")
-            ),
-        }
