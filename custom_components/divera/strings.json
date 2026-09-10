@@ -18,14 +18,14 @@
       },
       "station": {
         "title": "Feuerwache konfigurieren",
-        "description": "Gib die vollständige Adresse der Feuerwache ein. Die Adresse wird einmalig in Koordinaten umgewandelt und anschließend gespeichert.",
+        "description": "Gib die vollständige Adresse der Feuerwache im Format „Straße Hausnummer, PLZ Ort“ ein.\n\nBeispiel: Vogelsangweg 14, 34346 Hann. Münden\n\nDie Adresse wird einmalig in Koordinaten umgewandelt und anschließend gespeichert.",
         "data": {
           "station_address": "Adresse der Feuerwache"
         }
       },
       "reconfigure": {
         "title": "Feuerwache ändern",
-        "description": "Hier kannst du die hinterlegte Feuerwache ändern.",
+        "description": "Gib die vollständige Adresse der Feuerwache im Format „Straße Hausnummer, PLZ Ort“ ein.\n\nBeispiel: Vogelsangweg 14, 34346 Hann. Münden",
         "data": {
           "station_address": "Adresse der Feuerwache"
         }
