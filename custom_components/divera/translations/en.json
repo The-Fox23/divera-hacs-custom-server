@@ -3,26 +3,36 @@
     "step": {
       "user": {
         "title": "Set up DIVERA 24/7",
-        "description": "Enter your DIVERA API key. You can find it in DIVERA under Settings → DEBUG → Accesskey.",
-        "data": {
-          "access_key": "API Key"
-        }
+        "description": "Enter the DIVERA server URL and API key.",
+        "data": {"base_url": "Server URL", "access_key": "API key"}
       },
       "select_ucr": {
         "title": "Select unit",
         "description": "Select the unit whose alarms should be displayed.",
-        "data": {
-          "ucr_id": "Unit"
-        }
+        "data": {"ucr_id": "Unit"}
+      },
+      "station": {
+        "title": "Configure fire station",
+        "description": "The address is geocoded once and the coordinates are stored.",
+        "data": {"station_address": "Fire station address"}
+      },
+      "reconfigure": {
+        "title": "Configure fire station",
+        "description": "Change the stored station address.",
+        "data": {"station_address": "Fire station address"}
       }
     },
     "error": {
-      "invalid_auth": "Invalid API key. Please check the key and try again.",
-      "cannot_connect": "Failed to connect to the DIVERA server. Please check your internet connection."
+      "invalid_auth": "Invalid API key.",
+      "invalid_url": "Invalid server URL.",
+      "cannot_connect": "Could not connect to the DIVERA server.",
+      "invalid_station": "Please enter a station address.",
+      "station_not_found": "The station address could not be geocoded."
     },
     "abort": {
       "already_configured": "This unit is already configured.",
-      "no_units": "No units found for this API key."
+      "no_units": "No units found for this API key.",
+      "reconfigure_successful": "Fire station updated."
     }
   }
 }
