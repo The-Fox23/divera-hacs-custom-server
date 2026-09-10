@@ -1,12 +1,15 @@
+
 """Config flow for DIVERA 24/7."""
 from __future__ import annotations
 
-from urllib.parse import quote, urlparse
+import logging
+from urllib.parse import urlparse
 
 import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -27,6 +30,8 @@ from .const import (
     GEOCODING_URL,
 )
 
+_LOGGER = logging.getLogger(__name__)
+
 
 class DiveraConfigFlow(
     config_entries.ConfigFlow,
@@ -37,6 +42,7 @@ class DiveraConfigFlow(
     VERSION = 2
 
     def __init__(self) -> None:
+        """Config Flow initialisieren."""
         self._base_url = DEFAULT_BASE_URL
         self._access_key = ""
         self._ucr_options: dict[str, str] = {}
@@ -62,17 +68,11 @@ class DiveraConfigFlow(
                 .strip()
             )
 
-            if not self._valid_base_url(
-                base_url
-            ):
-                errors[CONF_BASE_URL] = (
-                    "invalid_url"
-                )
+            if not self._valid_base_url(base_url):
+                errors[CONF_BASE_URL] = "invalid_url"
 
             elif not access_key:
-                errors[CONF_ACCESS_KEY] = (
-                    "invalid_auth"
-                )
+                errors[CONF_ACCESS_KEY] = "invalid_auth"
 
             else:
                 (
@@ -89,13 +89,9 @@ class DiveraConfigFlow(
                 else:
                     self._base_url = base_url
                     self._access_key = access_key
-                    self._ucr_options = (
-                        ucr_options
-                    )
+                    self._ucr_options = ucr_options
 
-                    return await (
-                        self.async_step_select_ucr()
-                    )
+                    return await self.async_step_select_ucr()
 
         return self.async_show_form(
             step_id="user",
@@ -106,7 +102,7 @@ class DiveraConfigFlow(
                         default=self._base_url,
                     ): str,
                     vol.Required(
-                        CONF_ACCESS_KEY
+                        CONF_ACCESS_KEY,
                     ): str,
                 }
             ),
@@ -119,15 +115,11 @@ class DiveraConfigFlow(
     ) -> FlowResult:
         """Einheit auswählen."""
         if user_input is not None:
-            self._ucr_id = user_input[
-                CONF_UCR_ID
-            ]
+            self._ucr_id = user_input[CONF_UCR_ID]
 
-            self._ucr_name = (
-                self._ucr_options.get(
-                    self._ucr_id,
-                    self._ucr_id,
-                )
+            self._ucr_name = self._ucr_options.get(
+                self._ucr_id,
+                self._ucr_id,
             )
 
             unique_id = (
@@ -135,9 +127,7 @@ class DiveraConfigFlow(
                 f"{self._ucr_id}"
             )
 
-            await self.async_set_unique_id(
-                unique_id
-            )
+            await self.async_set_unique_id(unique_id)
 
             self._abort_if_unique_id_configured()
 
@@ -155,8 +145,7 @@ class DiveraConfigFlow(
                         "value": uid,
                         "label": name,
                     }
-                    for uid, name
-                    in self._ucr_options.items()
+                    for uid, name in self._ucr_options.items()
                 ],
                 mode=SelectSelectorMode.LIST,
             )
@@ -182,9 +171,7 @@ class DiveraConfigFlow(
 
         if user_input is not None:
             address = (
-                user_input[
-                    CONF_STATION_ADDRESS
-                ]
+                user_input[CONF_STATION_ADDRESS]
                 .strip()
             )
 
@@ -206,8 +193,14 @@ class DiveraConfigFlow(
                     ] = "station_not_found"
 
                 else:
-                    latitude, longitude = (
-                        coordinates
+                    latitude, longitude = coordinates
+
+                    _LOGGER.info(
+                        "DIVERA Feuerwache geocodiert: "
+                        "%s -> %.6f, %.6f",
+                        address,
+                        latitude,
+                        longitude,
                     )
 
                     return self.async_create_entry(
@@ -216,20 +209,13 @@ class DiveraConfigFlow(
                             f"{self._ucr_name}"
                         ),
                         data={
-                            CONF_BASE_URL:
-                                self._base_url,
-                            CONF_ACCESS_KEY:
-                                self._access_key,
-                            CONF_UCR_ID:
-                                self._ucr_id,
-                            CONF_UCR_NAME:
-                                self._ucr_name,
-                            CONF_STATION_ADDRESS:
-                                address,
-                            CONF_STATION_LATITUDE:
-                                latitude,
-                            CONF_STATION_LONGITUDE:
-                                longitude,
+                            CONF_BASE_URL: self._base_url,
+                            CONF_ACCESS_KEY: self._access_key,
+                            CONF_UCR_ID: self._ucr_id,
+                            CONF_UCR_NAME: self._ucr_name,
+                            CONF_STATION_ADDRESS: address,
+                            CONF_STATION_LATITUDE: latitude,
+                            CONF_STATION_LONGITUDE: longitude,
                         },
                     )
 
@@ -254,11 +240,26 @@ class DiveraConfigFlow(
 
         if user_input is not None:
             address = (
-                user_input[
-                    CONF_STATION_ADDRESS
-                ]
+                user_input[CONF_STATION_ADDRESS]
                 .strip()
             )
+
+            if not address:
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=vol.Schema(
+                        {
+                            vol.Required(
+                                CONF_STATION_ADDRESS,
+                                default=address,
+                            ): str,
+                        }
+                    ),
+                    errors={
+                        CONF_STATION_ADDRESS:
+                            "invalid_station"
+                    },
+                )
 
             coordinates = (
                 await self._geocode_address(
@@ -288,12 +289,9 @@ class DiveraConfigFlow(
             return self.async_update_reload_and_abort(
                 entry,
                 data_updates={
-                    CONF_STATION_ADDRESS:
-                        address,
-                    CONF_STATION_LATITUDE:
-                        latitude,
-                    CONF_STATION_LONGITUDE:
-                        longitude,
+                    CONF_STATION_ADDRESS: address,
+                    CONF_STATION_LATITUDE: latitude,
+                    CONF_STATION_LONGITUDE: longitude,
                 },
             )
 
@@ -326,54 +324,70 @@ class DiveraConfigFlow(
             f"{base_url}/api/v2/pull/all"
         )
 
+        session = async_get_clientsession(
+            self.hass
+        )
+
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    jwt_url,
-                    params={
-                        "accesskey": access_key
-                    },
-                    timeout=aiohttp.ClientTimeout(
-                        total=10
-                    ),
-                ) as resp:
+            async with session.get(
+                jwt_url,
+                params={
+                    "accesskey": access_key
+                },
+                timeout=aiohttp.ClientTimeout(
+                    total=10
+                ),
+            ) as resp:
+                if resp.status == 401:
+                    return {}, "invalid_auth"
 
-                    if resp.status == 401:
-                        return {}, "invalid_auth"
-
-                    if resp.status != 200:
-                        return {}, "cannot_connect"
+                if resp.status != 200:
+                    _LOGGER.error(
+                        "DIVERA JWT Anfrage fehlgeschlagen: HTTP %s",
+                        resp.status,
+                    )
+                    return {}, "cannot_connect"
 
         except (
             aiohttp.ClientError,
             TimeoutError,
-        ):
+        ) as err:
+            _LOGGER.error(
+                "Verbindung zum DIVERA Server fehlgeschlagen: %s",
+                err,
+            )
             return {}, "cannot_connect"
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    pull_url,
-                    params={
-                        "accesskey": access_key
-                    },
-                    timeout=aiohttp.ClientTimeout(
-                        total=10
-                    ),
-                ) as resp:
+            async with session.get(
+                pull_url,
+                params={
+                    "accesskey": access_key
+                },
+                timeout=aiohttp.ClientTimeout(
+                    total=10
+                ),
+            ) as resp:
+                if resp.status == 401:
+                    return {}, "invalid_auth"
 
-                    if resp.status == 401:
-                        return {}, "invalid_auth"
+                if resp.status != 200:
+                    _LOGGER.error(
+                        "DIVERA Pull Anfrage fehlgeschlagen: HTTP %s",
+                        resp.status,
+                    )
+                    return {}, "cannot_connect"
 
-                    if resp.status != 200:
-                        return {}, "cannot_connect"
-
-                    payload = await resp.json()
+                payload = await resp.json()
 
         except (
             aiohttp.ClientError,
             TimeoutError,
-        ):
+        ) as err:
+            _LOGGER.error(
+                "DIVERA Pull Anfrage fehlgeschlagen: %s",
+                err,
+            )
             return {}, "cannot_connect"
 
         ucr_raw = (
@@ -383,10 +397,7 @@ class DiveraConfigFlow(
         )
 
         if (
-            not isinstance(
-                ucr_raw,
-                dict,
-            )
+            not isinstance(ucr_raw, dict)
             or not ucr_raw
         ):
             return {
@@ -395,13 +406,8 @@ class DiveraConfigFlow(
 
         options: dict[str, str] = {}
 
-        for ucr_id, ucr_data in (
-            ucr_raw.items()
-        ):
-            if isinstance(
-                ucr_data,
-                dict,
-            ):
+        for ucr_id, ucr_data in ucr_raw.items():
+            if isinstance(ucr_data, dict):
                 name = (
                     ucr_data.get("name")
                     or ucr_data.get("shortname")
@@ -410,9 +416,7 @@ class DiveraConfigFlow(
             else:
                 name = str(ucr_id)
 
-            options[
-                str(ucr_id)
-            ] = name
+            options[str(ucr_id)] = name
 
         return options, None
 
@@ -420,57 +424,134 @@ class DiveraConfigFlow(
         self,
         address: str,
     ) -> tuple[float, float] | None:
-        """Feuerwachen-Adresse einmalig geocodieren."""
+        """Feuerwachen-Adresse geocodieren."""
         params = {
             "q": address,
             "format": "jsonv2",
             "limit": 1,
+            "countrycodes": "de",
+            "addressdetails": 1,
+            "accept-language": "de",
         }
 
         headers = {
             "User-Agent": (
-                "DIVERA-Home-Assistant-Integration"
-            )
+                "DIVERA-24-7-Home-Assistant-Integration/"
+                "1.1.0"
+            ),
+            "Accept": "application/json",
         }
 
+        session = async_get_clientsession(
+            self.hass
+        )
+
+        _LOGGER.debug(
+            "Geocodiere DIVERA Feuerwache: %s",
+            address,
+        )
+
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    GEOCODING_URL,
-                    params=params,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(
-                        total=15
-                    ),
-                ) as response:
+            async with session.get(
+                GEOCODING_URL,
+                params=params,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(
+                    total=20
+                ),
+            ) as response:
 
-                    if response.status != 200:
-                        return None
+                if response.status != 200:
+                    response_text = await response.text()
 
-                    results = await response.json()
+                    _LOGGER.error(
+                        "Nominatim Geocoding fehlgeschlagen: "
+                        "HTTP %s - %s",
+                        response.status,
+                        response_text[:500],
+                    )
 
-        except (
-            aiohttp.ClientError,
-            TimeoutError,
-        ):
+                    return None
+
+                results = await response.json()
+
+        except aiohttp.ClientResponseError as err:
+            _LOGGER.error(
+                "Nominatim HTTP Fehler: %s",
+                err,
+            )
+            return None
+
+        except aiohttp.ClientConnectorError as err:
+            _LOGGER.error(
+                "Nominatim konnte nicht erreicht werden: %s",
+                err,
+            )
+            return None
+
+        except asyncio.TimeoutError:
+            _LOGGER.error(
+                "Nominatim Geocoding Timeout für: %s",
+                address,
+            )
+            return None
+
+        except aiohttp.ClientError as err:
+            _LOGGER.error(
+                "Nominatim Anfrage fehlgeschlagen: %s",
+                err,
+            )
+            return None
+
+        except ValueError as err:
+            _LOGGER.error(
+                "Nominatim lieferte kein gültiges JSON: %s",
+                err,
+            )
+            return None
+
+        if not isinstance(results, list):
+            _LOGGER.error(
+                "Nominatim lieferte unerwartete Daten: %s",
+                results,
+            )
             return None
 
         if not results:
+            _LOGGER.warning(
+                "Nominatim hat keine Adresse gefunden: %s",
+                address,
+            )
             return None
 
         try:
             latitude = float(
                 results[0]["lat"]
             )
+
             longitude = float(
                 results[0]["lon"]
             )
+
         except (
             KeyError,
             TypeError,
             ValueError,
-        ):
+        ) as err:
+            _LOGGER.error(
+                "Nominatim Ergebnis enthält keine "
+                "gültigen Koordinaten: %s",
+                err,
+            )
             return None
+
+        _LOGGER.info(
+            "Nominatim Ergebnis für '%s': "
+            "%.6f, %.6f",
+            address,
+            latitude,
+            longitude,
+        )
 
         return latitude, longitude
 
@@ -493,3 +574,5 @@ class DiveraConfigFlow(
             )
             and bool(parsed.netloc)
         )
+
+
