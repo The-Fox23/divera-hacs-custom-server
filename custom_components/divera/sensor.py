@@ -13,71 +13,32 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_BASE_URL, CONF_UCR_ID, CONF_UCR_NAME, DOMAIN
 from .coordinator import DiveraCoordinator
+from .route import DiveraRouteCoordinator
 
 NO_ALARM_STATE = "Kein aktiver Einsatz"
 
 
-def _fmt_ts(unix: int | None) -> str | None:
-    """Unix-Zeitstempel in ISO-Zeit umwandeln."""
-    if unix is None:
+def _fmt_ts(value) -> str | None:
+    if value is None:
         return None
-
     try:
-        return datetime.fromtimestamp(
-            unix,
-            tz=timezone.utc,
-        ).isoformat()
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat()
     except (TypeError, ValueError, OSError):
-        return str(unix)
+        return str(value)
 
 
-def _get_server_hash(base_url: str) -> str:
-    """Eindeutigen Hash für den DIVERA Server erzeugen."""
-    return hashlib.sha1(
-        base_url.encode("utf-8")
-    ).hexdigest()[:8]
+def _ids(entry: ConfigEntry, prefix: str = "") -> tuple[str, str, str]:
+    name = entry.data.get(CONF_UCR_NAME, "DIVERA")
+    ucr = entry.data.get(CONF_UCR_ID, entry.entry_id)
+    server = hashlib.sha1(entry.data.get(CONF_BASE_URL, "").encode()).hexdigest()[:8]
+    uid = f"{server}_{ucr}"
+    return name, uid, f"divera_{prefix}{uid}"
 
 
-def _get_unique_id(
-    entry: ConfigEntry,
-    prefix: str = "",
-) -> tuple[str, str, str]:
-    """Eindeutige IDs und Namen erzeugen."""
-    ucr_name: str = entry.data.get(
-        CONF_UCR_NAME,
-        "DIVERA",
-    )
-
-    ucr_id: str = entry.data.get(
-        CONF_UCR_ID,
-        entry.entry_id,
-    )
-
-    base_url: str = entry.data.get(
-        CONF_BASE_URL,
-        "",
-    )
-
-    server_hash = _get_server_hash(base_url)
-    unique_id = f"{server_hash}_{ucr_id}"
-
-    return (
-        ucr_name,
-        unique_id,
-        f"divera_{prefix}{unique_id}",
-    )
-
-
-def _get_device_info(
-    ucr_name: str,
-    unique_id: str,
-) -> DeviceInfo:
-    """Gemeinsame Geräteinformationen erzeugen."""
+def _device(name: str, uid: str) -> DeviceInfo:
     return DeviceInfo(
-        identifiers={
-            (DOMAIN, unique_id)
-        },
-        name=f"DIVERA 24/7 – {ucr_name}",
+        identifiers={(DOMAIN, uid)},
+        name=f"DIVERA 24/7 – {name}",
         manufacturer="DIVERA GmbH",
         model="DIVERA 24/7",
     )
@@ -88,557 +49,179 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """DIVERA Sensoren erstellen."""
     coordinator: DiveraCoordinator = hass.data[DOMAIN][entry.entry_id]
+    route: DiveraRouteCoordinator = hass.data[f"{DOMAIN}_route"][entry.entry_id]
+    async_add_entities([
+        DiveraAlarmSensor(coordinator, entry),
+        DiveraAlarmTextSensor(coordinator, entry),
+        DiveraAddressSensor(coordinator, entry),
+        DiveraAlarmIdSensor(coordinator, entry),
+        DiveraAlarmTimeSensor(coordinator, entry),
+        DiveraDurationSensor(coordinator, entry),
+        DiveraRecipientsSensor(coordinator, entry),
+        DiveraReadSensor(coordinator, entry),
+        DiveraReportSensor(coordinator, entry),
+        DiveraLatitudeSensor(coordinator, entry),
+        DiveraLongitudeSensor(coordinator, entry),
+        DiveraRouteDistanceSensor(route, entry),
+        DiveraRouteDurationSensor(route, entry),
+        DiveraRouteStatusSensor(route, entry),
+        DiveraRouteGeometrySensor(route, entry),
+    ])
 
-    async_add_entities(
-        [
-            DiveraSensor(coordinator, entry),
-            DiveraAlarmTextSensor(coordinator, entry),
-            DiveraAddressSensor(coordinator, entry),
-            DiveraAlarmIdSensor(coordinator, entry),
-            DiveraAlarmTimeSensor(coordinator, entry),
-            DiveraDurationSensor(coordinator, entry),
-            DiveraRecipientsSensor(coordinator, entry),
-            DiveraReadSensor(coordinator, entry),
-            DiveraReportSensor(coordinator, entry),
-            DiveraLatitudeSensor(coordinator, entry),
-            DiveraLongitudeSensor(coordinator, entry),
-        ]
-    )
 
-
-class DiveraSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """DIVERA Alarm Sensor."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
+class _Base(CoordinatorEntity[DiveraCoordinator], SensorEntity):
+    def __init__(self, coordinator: DiveraCoordinator, entry: ConfigEntry, prefix: str, name: str):
         super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry
-        )
-
-        self._attr_name = f"DIVERA {ucr_name}"
-        self._attr_unique_id = sensor_id
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
+        ucr_name, uid, entity_id = _ids(entry, prefix)
+        self._attr_name = f"{name} {ucr_name}"
+        self._attr_unique_id = entity_id
+        self._attr_device_info = _device(ucr_name, uid)
 
     @property
-    def native_value(self) -> str:
-        """Aktuellen Alarm als Sensorwert zurückgeben."""
-        alarm = self.coordinator.data
+    def alarm(self) -> dict | None:
+        return self.coordinator.data if isinstance(self.coordinator.data, dict) else None
 
-        if alarm is None:
-            return NO_ALARM_STATE
 
-        return alarm.get(
-            "title"
-        ) or NO_ALARM_STATE
-
+class DiveraAlarmSensor(_Base):
+    def __init__(self, c, e): super().__init__(c, e, "", "DIVERA")
     @property
-    def extra_state_attributes(self) -> dict:
-        """Alarmdaten als Sensorattribute bereitstellen."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return {}
-
-        attrs: dict = {}
-
-        attrs["stichwort"] = alarm.get("title")
-        attrs["beschreibung"] = alarm.get("text")
-        attrs["adresse"] = alarm.get("address")
-        attrs["einsatz_id"] = alarm.get("id")
-        attrs["prioritaet"] = alarm.get("priority")
-        attrs["geschlossen"] = alarm.get("closed")
-        attrs["alarmiert_am"] = _fmt_ts(
-            alarm.get("date")
-        )
-        attrs["latitude"] = alarm.get("lat")
-        attrs["longitude"] = alarm.get("lng")
-        attrs["fahrzeuge"] = alarm.get("vehicles")
-
-        bekannte = {
-            "title",
-            "text",
-            "address",
-            "id",
-            "priority",
-            "closed",
-            "date",
-            "lat",
-            "lng",
-            "vehicles",
+    def native_value(self): return (self.alarm or {}).get("title") or NO_ALARM_STATE
+    @property
+    def extra_state_attributes(self):
+        a = self.alarm
+        if not a: return {}
+        known = {"title","text","address","id","priority","closed","date","lat","lng","vehicles"}
+        attrs = {
+            "stichwort": a.get("title"), "beschreibung": a.get("text"), "adresse": a.get("address"),
+            "einsatz_id": a.get("id"), "prioritaet": a.get("priority"), "geschlossen": a.get("closed"),
+            "alarmiert_am": _fmt_ts(a.get("date")), "latitude": a.get("lat"), "longitude": a.get("lng"),
+            "fahrzeuge": a.get("vehicles"),
         }
-
-        for key, value in alarm.items():
-            if key not in bekannte:
-                attrs[key] = value
-
-        return {
-            key: value
-            for key, value in attrs.items()
-            if value is not None
-        }
+        attrs.update({k:v for k,v in a.items() if k not in known})
+        return {k:v for k,v in attrs.items() if v is not None}
 
 
-class DiveraAlarmTextSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für den Alarmtext."""
+class DiveraAlarmTextSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"alarmtext_","DIVERA Alarmtext")
+    @property
+    def native_value(self): return str((self.alarm or {}).get("text") or "")[:255]
+    @property
+    def extra_state_attributes(self):
+        a=self.alarm or {}; return {k:v for k,v in {"volltext":a.get("text"),"stichwort":a.get("title"),"adresse":a.get("address"),"einsatz_id":a.get("id")}.items() if v is not None}
 
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
+
+class DiveraAddressSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"adresse_","DIVERA Einsatzadresse")
+    @property
+    def native_value(self): return str((self.alarm or {}).get("address") or "")
+
+
+class DiveraAlarmIdSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"einsatz_id_","DIVERA Einsatz ID")
+    @property
+    def native_value(self):
+        v=(self.alarm or {}).get("id"); return str(v) if v is not None else ""
+
+
+class DiveraAlarmTimeSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"alarmzeit_","DIVERA Alarmzeit")
+    @property
+    def native_value(self): return _fmt_ts((self.alarm or {}).get("date")) or ""
+
+
+class DiveraDurationSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"einsatzdauer_","DIVERA Einsatzdauer")
+    @property
+    def native_value(self): return str((self.alarm or {}).get("duration") or "")
+
+
+class DiveraRecipientsSensor(_Base):
+    def __init__(self,c,e):
+        super().__init__(c,e,"alarmierte_","DIVERA Alarmierte"); self._attr_native_unit_of_measurement="Personen"
+    @property
+    def native_value(self): return int((self.alarm or {}).get("count_recipients") or 0)
+
+
+class DiveraReadSensor(_Base):
+    def __init__(self,c,e):
+        super().__init__(c,e,"gelesen_","DIVERA Gelesen"); self._attr_native_unit_of_measurement="Personen"
+    @property
+    def native_value(self): return int((self.alarm or {}).get("count_read") or 0)
+
+
+class DiveraReportSensor(_Base):
+    def __init__(self,c,e): super().__init__(c,e,"bericht_","DIVERA Einsatzbericht")
+    @property
+    def native_value(self): return str((self.alarm or {}).get("report") or "")
+
+
+class _CoordinateSensor(_Base):
+    key = ""
+    unit = "°"
+    def __init__(self,c,e,prefix,name):
+        super().__init__(c,e,prefix,name); self._attr_native_unit_of_measurement=self.unit
+    @property
+    def native_value(self):
+        value=(self.alarm or {}).get(self.key)
+        try: return float(value) if value is not None else None
+        except (TypeError,ValueError): return None
+
+
+class DiveraLatitudeSensor(_CoordinateSensor):
+    key="lat"
+    def __init__(self,c,e): super().__init__(c,e,"latitude_","DIVERA Latitude")
+
+
+class DiveraLongitudeSensor(_CoordinateSensor):
+    key="lng"
+    def __init__(self,c,e): super().__init__(c,e,"longitude_","DIVERA Longitude")
+
+
+class _RouteSensor(CoordinatorEntity[DiveraRouteCoordinator], SensorEntity):
+    def __init__(self, coordinator: DiveraRouteCoordinator, entry: ConfigEntry, prefix: str, name: str):
         super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "alarmtext_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Alarmtext {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
+        ucr_name, uid, entity_id = _ids(entry, prefix)
+        self._attr_name=f"{name} {ucr_name}"
+        self._attr_unique_id=entity_id
+        self._attr_device_info=_device(ucr_name, uid)
 
     @property
-    def native_value(self) -> str:
-        """Alarmtext als Sensorwert zurückgeben."""
-        alarm = self.coordinator.data
+    def route(self): return self.coordinator.data
 
-        if alarm is None:
-            return ""
 
-        text = alarm.get("text")
-
-        if text is None:
-            return ""
-
-        return str(text)[:255]
-
+class DiveraRouteDistanceSensor(_RouteSensor):
+    def __init__(self,c,e):
+        super().__init__(c,e,"routenentfernung_","DIVERA Routenentfernung"); self._attr_native_unit_of_measurement="km"
     @property
-    def extra_state_attributes(self) -> dict:
-        """Zusätzliche Informationen zum Alarmtext."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return {}
-
-        text = alarm.get("text")
-
-        if text is None:
-            return {}
-
-        return {
-            "volltext": str(text),
-            "stichwort": alarm.get("title"),
-            "adresse": alarm.get("address"),
-            "einsatz_id": alarm.get("id"),
-        }
+    def native_value(self):
+        r=self.route; return round(r["distance_m"]/1000,1) if r else None
 
 
-class DiveraAddressSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Einsatzadresse."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "adresse_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Einsatzadresse {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
+class DiveraRouteDurationSensor(_RouteSensor):
+    def __init__(self,c,e):
+        super().__init__(c,e,"routenfahrzeit_","DIVERA Fahrzeit")
+        self._attr_native_unit_of_measurement="min"
     @property
-    def native_value(self) -> str:
-        """Einsatzadresse zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return ""
-
-        return str(
-            alarm.get("address") or ""
-        )
+    def native_value(self):
+        r=self.route; return round(r["duration_s"]/60,1) if r else None
 
 
-class DiveraAlarmIdSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Einsatz-ID."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "einsatz_id_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Einsatz ID {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
+class DiveraRouteStatusSensor(_RouteSensor):
+    def __init__(self,c,e): super().__init__(c,e,"routenstatus_","DIVERA Routenstatus")
     @property
-    def native_value(self) -> str:
-        """Einsatz-ID zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return ""
-
-        value = alarm.get("id")
-
-        return str(value) if value is not None else ""
-
-
-class DiveraAlarmTimeSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Alarmzeit."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "alarmzeit_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Alarmzeit {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
+    def native_value(self): return "Route vorhanden" if self.route else "Keine aktive Route"
     @property
-    def native_value(self) -> str:
-        """Alarmzeit zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return ""
-
-        timestamp = alarm.get("date")
-
-        return _fmt_ts(timestamp) or ""
+    def extra_state_attributes(self):
+        r=self.route or {}; return {k:v for k,v in r.items() if k != "geometry"}
 
 
-class DiveraDurationSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Einsatzdauer."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "einsatzdauer_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Einsatzdauer {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
+class DiveraRouteGeometrySensor(_RouteSensor):
+    def __init__(self,c,e): super().__init__(c,e,"route_geojson_","DIVERA Route GeoJSON")
     @property
-    def native_value(self) -> str:
-        """Einsatzdauer zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return ""
-
-        return str(
-            alarm.get("duration") or ""
-        )
-
-
-class DiveraRecipientsSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Anzahl der alarmierten Empfänger."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "alarmierte_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Alarmierte {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-        self._attr_native_unit_of_measurement = "Personen"
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
+    def native_value(self): return "Route vorhanden" if self.route else "Keine aktive Route"
     @property
-    def native_value(self) -> int:
-        """Anzahl der alarmierten Empfänger."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return 0
-
-        return int(
-            alarm.get("count_recipients") or 0
-        )
-
-
-class DiveraReadSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für die Anzahl der gelesenen Alarmierungen."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "gelesen_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Gelesen {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-        self._attr_native_unit_of_measurement = "Personen"
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
-    @property
-    def native_value(self) -> int:
-        """Anzahl der gelesenen Alarmierungen."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return 0
-
-        return int(
-            alarm.get("count_read") or 0
-        )
-
-
-class DiveraReportSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für den Einsatzbericht."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "bericht_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Einsatzbericht {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
-    @property
-    def native_value(self) -> str:
-        """Einsatzbericht zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return ""
-
-        return str(
-            alarm.get("report") or ""
-        )
-
-
-class DiveraLatitudeSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für den Breitengrad."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "latitude_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Latitude {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-        self._attr_native_unit_of_measurement = "°"
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
-    @property
-    def native_value(self) -> float | None:
-        """Breitengrad zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return None
-
-        value = alarm.get("lat")
-
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
-
-class DiveraLongitudeSensor(
-    CoordinatorEntity[DiveraCoordinator],
-    SensorEntity,
-):
-    """Sensor für den Längengrad."""
-
-    def __init__(
-        self,
-        coordinator: DiveraCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        super().__init__(coordinator)
-
-        ucr_name, unique_id, sensor_id = _get_unique_id(
-            entry,
-            "longitude_",
-        )
-
-        self._attr_name = (
-            f"DIVERA Longitude {ucr_name}"
-        )
-
-        self._attr_unique_id = sensor_id
-        self._attr_native_unit_of_measurement = "°"
-
-        self._attr_device_info = _get_device_info(
-            ucr_name,
-            unique_id,
-        )
-
-    @property
-    def native_value(self) -> float | None:
-        """Längengrad zurückgeben."""
-        alarm = self.coordinator.data
-
-        if alarm is None:
-            return None
-
-        value = alarm.get("lng")
-
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
+    def extra_state_attributes(self):
+        r=self.route
+        if not r: return {}
+        return {"geometry": {"type":"LineString","coordinates":r.get("geometry",[])}}
