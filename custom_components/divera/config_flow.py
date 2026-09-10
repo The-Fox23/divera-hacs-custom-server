@@ -2,6 +2,7 @@
 """Config flow for DIVERA 24/7."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from urllib.parse import urlparse
 
