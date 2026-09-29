@@ -203,33 +203,41 @@ class DiveraCoordinator(DataUpdateCoordinator):
                 f"Verbindungsfehler: {err}"
             ) from err
 
-        return self._extract_alarm(payload)
+        return self._extract_data(payload)
 
-    def _extract_alarm(self, payload: dict):
-        """Neuesten aktiven Alarm aus der API-Antwort extrahieren."""
-        items = payload.get(
-            "data", {}
-        ).get(
-            "alarm", {}
-        ).get(
-            "items", []
-        )
+    def _extract_data(self, payload: dict) -> dict:
+        """Alarm-, Fahrzeug- und FMS-Daten aus pull/all zusammenführen."""
+        data = payload.get("data", {})
+        if not isinstance(data, dict):
+            return {"vehicles": {}, "fms_status": {}}
 
-        # items kann [] oder ein Dictionary sein.
-        if not items or not isinstance(items, dict):
-            return None
+        result = {"vehicles": {}, "fms_status": {}}
+        cluster = data.get("cluster", {})
+
+        if isinstance(cluster, dict):
+            vehicles = cluster.get("vehicle", {})
+            if isinstance(vehicles, dict):
+                result["vehicles"] = vehicles
+
+            fms_status = cluster.get("fms_status", {})
+            if isinstance(fms_status, dict):
+                result["fms_status"] = fms_status
+
+        items = data.get("alarm", {}).get("items", [])
+        if not isinstance(items, dict) or not items:
+            return result
 
         alarms = list(items.values())
+        alarm = max(alarms, key=lambda item: item.get("id", 0))
+        if isinstance(alarm, dict):
+            result.update(alarm)
 
         _LOGGER.debug(
-            "DIVERA: %d Alarm(e) gefunden",
+            "DIVERA: %d Alarm(e), %d Fahrzeug(e) gefunden",
             len(alarms),
+            len(result["vehicles"]),
         )
-
-        return max(
-            alarms,
-            key=lambda alarm: alarm.get("id", 0),
-        )
+        return result
 
     # ------------------------------------------------------------------
     # WebSocket
@@ -436,9 +444,9 @@ class DiveraCoordinator(DataUpdateCoordinator):
 
         elif msg_type == "cluster-vehicle":
             _LOGGER.debug(
-                "DIVERA: Fahrzeugstatus-Update: %s",
-                data.get("payload"),
+                "DIVERA: Fahrzeugstatus-Update – lade aktuelle Fahrzeugdaten"
             )
+            await self.async_refresh()
 
         elif msg_type == "user-status":
             _LOGGER.debug(
