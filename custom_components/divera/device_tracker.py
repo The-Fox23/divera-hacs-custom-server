@@ -232,6 +232,7 @@ class DiveraVehicleTracker(CoordinatorEntity[DiveraCoordinator], TrackerEntity):
         super().__init__(coordinator)
         self.vehicle_id = str(vehicle_id)
         ucr_name, uid, _ = _get_unique_id(entry, f"fahrzeug_{self.vehicle_id}_")
+        self._ucr_name = ucr_name
         self._attr_name = f"DIVERA Fahrzeug {self.vehicle_id} {ucr_name}"
         self._attr_unique_id = f"divera_fahrzeug_{self.vehicle_id}_{uid}"
         self._attr_device_info = _get_device_info(ucr_name, uid)
@@ -241,6 +242,21 @@ class DiveraVehicleTracker(CoordinatorEntity[DiveraCoordinator], TrackerEntity):
         vehicles = self.coordinator.data.get("vehicles", {}) if self.coordinator.data else {}
         value = vehicles.get(self.vehicle_id, {})
         return value if isinstance(value, dict) else {}
+
+    @property
+    def name(self) -> str:
+        """Return the human-readable DIVERA vehicle name."""
+        vehicle = self.vehicle
+        shortname = str(vehicle.get("shortname") or "").strip()
+        vehicle_name = str(vehicle.get("name") or "").strip()
+
+        if shortname and vehicle_name:
+            return f"{shortname} / {vehicle_name}"
+        if shortname:
+            return shortname
+        if vehicle_name:
+            return vehicle_name
+        return f"Fahrzeug {self.vehicle_id}"
 
     @property
     def available(self) -> bool:
