@@ -6,8 +6,9 @@ from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -68,6 +69,10 @@ async def async_setup_entry(
         DiveraRouteStatusSensor(route, entry),
         DiveraRouteGeometrySensor(route, entry),
     ])
+
+    vehicle_manager = DiveraVehicleSensorManager(coordinator, entry, async_add_entities)
+    hass.data.setdefault(f"{DOMAIN}_vehicle_sensors", {})[entry.entry_id] = vehicle_manager
+    vehicle_manager.start()
 
 
 class _Base(CoordinatorEntity[DiveraCoordinator], SensorEntity):
@@ -176,6 +181,79 @@ class DiveraLatitudeSensor(_CoordinateSensor):
 class DiveraLongitudeSensor(_CoordinateSensor):
     key="lng"
     def __init__(self,c,e): super().__init__(c,e,"longitude_","DIVERA Longitude")
+
+
+class DiveraVehicleSensorManager:
+    """Manages dynamic vehicle status sensors."""
+
+    def __init__(self, coordinator, entry, async_add_entities) -> None:
+        self.coordinator = coordinator
+        self.entry = entry
+        self.hass = coordinator.hass
+        self._add = async_add_entities
+        self._known: set[str] = set()
+        self._unsub = None
+
+    def start(self) -> None:
+        if self._unsub is None:
+            self._unsub = self.coordinator.async_add_listener(self._sync)
+            self._sync()
+
+    @callback
+    def _sync(self) -> None:
+        vehicles = self.coordinator.data.get("vehicles", {}) if self.coordinator.data else {}
+        vehicles = vehicles if isinstance(vehicles, dict) else {}
+        current = {str(v) for v in vehicles}
+        removed = self._known - current
+        registry = er.async_get(self.hass)
+        for vehicle_id in removed:
+            _, _, unique_id = _ids(self.entry, f"fahrzeug_{vehicle_id}_")
+            entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+            if entity_id:
+                registry.async_remove(entity_id)
+        self._known -= removed
+        new_ids = current - self._known
+        if new_ids:
+            self._add(
+                [DiveraVehicleSensor(self.coordinator, self.entry, v) for v in new_ids],
+                update_before_add=False,
+            )
+            self._known |= new_ids
+
+
+class DiveraVehicleSensor(_Base):
+    """Current FMS status of one DIVERA vehicle."""
+
+    def __init__(self, coordinator, entry, vehicle_id: str) -> None:
+        self.vehicle_id = str(vehicle_id)
+        super().__init__(
+            coordinator, entry, f"fahrzeug_{self.vehicle_id}_",
+            f"DIVERA Fahrzeug {self.vehicle_id}",
+        )
+
+    @property
+    def vehicle(self) -> dict:
+        vehicles = self.coordinator.data.get("vehicles", {}) if self.coordinator.data else {}
+        value = vehicles.get(self.vehicle_id, {})
+        return value if isinstance(value, dict) else {}
+
+    @property
+    def native_value(self):
+        status = self.vehicle.get("fmsstatus_id")
+        return str(status) if status is not None else "unbekannt"
+
+    @property
+    def extra_state_attributes(self):
+        vehicle = dict(self.vehicle)
+        status_id = vehicle.get("fmsstatus_id")
+        statuses = self.coordinator.data.get("fms_status", {}) if self.coordinator.data else {}
+        items = statuses.get("items", statuses) if isinstance(statuses, dict) else {}
+        status = items.get(str(status_id), {}) if isinstance(items, dict) and status_id is not None else {}
+        if isinstance(status, dict):
+            vehicle["fms_status_name"] = status.get("name")
+            vehicle["fms_status_color"] = status.get("color_hex")
+        vehicle["fahrzeug_id"] = self.vehicle_id
+        return vehicle
 
 
 class _RouteSensor(CoordinatorEntity[DiveraRouteCoordinator], SensorEntity):
