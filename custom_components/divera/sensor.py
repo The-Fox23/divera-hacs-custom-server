@@ -232,6 +232,21 @@ class DiveraVehicleSensor(_Base):
         )
 
     @property
+    def name(self) -> str:
+        """Return the human-readable DIVERA vehicle name."""
+        vehicle = self.vehicle
+        shortname = str(vehicle.get("shortname") or "").strip()
+        vehicle_name = str(vehicle.get("name") or "").strip()
+
+        if shortname and vehicle_name:
+            return f"{shortname} / {vehicle_name}"
+        if shortname:
+            return shortname
+        if vehicle_name:
+            return vehicle_name
+        return f"Fahrzeug {self.vehicle_id}"
+
+    @property
     def vehicle(self) -> dict:
         vehicles = self.coordinator.data.get("vehicles", {}) if self.coordinator.data else {}
         value = vehicles.get(self.vehicle_id, {})
