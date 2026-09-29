@@ -3,7 +3,7 @@
 
 **Repository:** `The-Fox23/divera-hacs-custom-server`  
 **Integration:** DIVERA 24/7 with Server URL  
-**Prepared manifest version:** `1.1.2`  
+**Prepared manifest version:** `1.1.3`  
 **Status:** 🟢 Vehicle status/position support implemented; practical HA test pending
 
 ---
@@ -88,6 +88,8 @@ For every vehicle returned by the API, dynamic entities are created.
 
 ### Vehicle sensor
 
+The vehicle sensor uses the DIVERA vehicle fields `shortname` and `name` for its human-readable entity name, for example `LF / 16-1`. The technical vehicle ID remains the stable internal identifier.
+
 The vehicle sensor provides:
 - current `fmsstatus_id`
 - vehicle ID
@@ -98,6 +100,8 @@ The vehicle sensor provides:
 The sensor is created dynamically when a vehicle appears and removed when it disappears from the API data.
 
 ### Vehicle device tracker
+
+The vehicle tracker also uses the DIVERA `shortname` / `name` combination for its human-readable entity name.
 
 A dynamic device tracker is created for every vehicle.
 
@@ -208,11 +212,11 @@ Example:
 
 ---
 
-## 10. HACS / release 1.1.2
+## 10. HACS / release 1.1.3
 
 The manifest is prepared with version:
 
-`1.1.2`
+`1.1.3`
 
 The HACS display name and Home Assistant integration name are aligned as:
 
@@ -226,8 +230,8 @@ Before publishing:
 - verify WebSocket vehicle updates
 - verify route sensors
 - verify incident close behaviour
-- create Git tag `v1.1.2`
-- create GitHub release `1.1.2`
+- create Git tag `v1.1.3`
+- create GitHub release `1.1.3`
 - test HACS update
 
 ---
@@ -263,7 +267,7 @@ Before publishing:
 | Old incompatible Route Sensor | 🔴 Not reintroduced |
 | Map presentation | 🟡 Next development step |
 | Translations | 🟡 Review required |
-| Release 1.1.2 | 🟡 Ready for user tag/release after testing |
+| Release 1.1.3 | 🟡 Ready for user tag/release after testing |
 
 ---
 
