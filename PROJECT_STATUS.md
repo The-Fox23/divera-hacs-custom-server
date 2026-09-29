@@ -2,15 +2,15 @@
 ## Project Status
 
 **Repository:** `The-Fox23/divera-hacs-custom-server`  
-**Integration:** DIVERA 24/7  
-**Current manifest version:** `1.1.0`  
-**Status:** 🟢 Functional development baseline
+**Integration:** DIVERA 24/7 with Server URL  
+**Prepared manifest version:** `1.1.2`  
+**Status:** 🟢 Vehicle status/position support implemented; practical HA test pending
 
 ---
 
 ## 1. Project goal
 
-This Home Assistant integration is based on the DIVERA 24/7 integration and extends it so that the DIVERA server URL can be configured freely.
+This Home Assistant integration extends DIVERA 24/7 with a configurable server URL and current operational data for alarms and vehicles.
 
 Goals:
 - support the public DIVERA server
@@ -18,9 +18,10 @@ Goals:
 - configure DIVERA units/UCRs
 - provide alarm information and sensors
 - provide fire-station and incident locations
+- provide vehicle status and vehicle positions
 - calculate a route from the fire station to the incident
 
-**Important:** The currently stable backend/WebSocket communication should not be changed without a concrete reason.
+**Important:** The stable backend/WebSocket connection remains the baseline and should not be changed unnecessarily.
 
 ---
 
@@ -42,26 +43,20 @@ Implemented:
 - `/api/v2/auth/jwt`
 - `/api/v2/pull/all`
 - UCR selection
+- extraction of vehicle data from `cluster.vehicle`
+- extraction of FMS status definitions from `cluster.fms_status`
 
 ### WebSocket
-**Status: 🟢 Stable / do not change unnecessarily**
+**Status: 🟢 Stable / unchanged architecture**
 
-Implemented:
-- JWT retrieval
-- WebSocket authentication
-- `init`
-- `cluster-pull`
-- `jwtExpired`
-- automatic reconnect
-- exponential reconnect delay
-- fallback polling
+Existing WebSocket authentication, reconnect handling and fallback polling remain in place.
+
+A `cluster-vehicle` event now triggers the existing REST refresh so the vehicle entities receive current API data.
 
 Current values:
 - reconnect delay: 10 seconds
 - maximum reconnect delay: 300 seconds
 - fallback polling: 60 seconds
-
-When WebSocket is active, fallback polling is disabled. When it is unavailable, 60-second polling is enabled.
 
 ---
 
@@ -80,29 +75,42 @@ Implemented:
 - read count
 - incident report
 - latitude/longitude
-- vehicle data
+- alarm vehicle data
 - additional DIVERA fields as attributes
 
 ---
 
-## 4. Sensors
+## 4. Vehicle support
 
-Current sensors include:
-- DIVERA alarm/stichwort
-- DIVERA alarm text
-- DIVERA incident address
-- DIVERA incident ID
-- DIVERA alarm time
-- DIVERA incident duration
-- DIVERA alerted persons
-- DIVERA read persons
-- DIVERA incident report
-- DIVERA latitude
-- DIVERA longitude
-- DIVERA route distance
-- DIVERA route duration
-- DIVERA route status
-- DIVERA route GeoJSON
+Vehicle data from `cluster.vehicle` is now retained by the coordinator instead of being discarded.
+
+For every vehicle returned by the API, dynamic entities are created.
+
+### Vehicle sensor
+
+The vehicle sensor provides:
+- current `fmsstatus_id`
+- vehicle ID
+- vehicle name/short name and other API fields as attributes
+- FMS status name when supplied by the API
+- FMS status color when supplied by the API
+
+The sensor is created dynamically when a vehicle appears and removed when it disappears from the API data.
+
+### Vehicle device tracker
+
+A dynamic device tracker is created for every vehicle.
+
+It provides:
+- latitude
+- longitude
+- GPS accuracy when available
+- vehicle information as attributes
+- FMS status information as attributes
+
+This provides the technical basis for displaying vehicles on a Home Assistant map.
+
+**Status:** 🟢 Implemented / practical Home Assistant test pending
 
 ---
 
@@ -118,10 +126,7 @@ Stored values:
 - `station_latitude`
 - `station_longitude`
 
-The coordinates are stored in the config entry.
-
-### Known point
-Geocoding may return a point somewhere along a street rather than the exact building. This is a limitation of the geocoding result and should be reviewed separately if greater precision is required.
+Known point: geocoding may return a point somewhere along a street rather than the exact building.
 
 ---
 
@@ -136,21 +141,21 @@ Provides the current incident coordinates when:
 - valid latitude/longitude are available
 - the incident is not closed
 
-Without a valid active incident, no incident position is exposed.
+### Vehicle trackers
+Provide the current API position of each DIVERA vehicle.
 
 ---
 
 ## 7. Routing
 
-**Status: 🟢 Implemented / practical testing still required**
+**Status: 🟢 Existing implementation retained**
 
-Routing is handled by a separate `DiveraRouteCoordinator`.
+Routing continues to use the current `DiveraRouteCoordinator` and OSRM implementation.
+
+The newer vehicle functionality does **not** reintroduce the old Route Sensor implementation from DiveraControl.
 
 Current routing service:
 `https://router.project-osrm.org`
-
-Profile:
-`driving`
 
 The route contains:
 - distance
@@ -159,8 +164,6 @@ The route contains:
 - incident ID
 - incident coordinates
 
-Routes are cached using rounded incident coordinates to avoid unnecessary repeated routing requests.
-
 ---
 
 ## 8. Planned map behaviour
@@ -168,7 +171,8 @@ Routes are cached using rounded incident coordinates to avoid unnecessary repeat
 ### No active incident
 - fire-station marker remains
 - no incident marker
-- no route
+- no incident route
+- vehicle trackers can still provide vehicle positions
 
 ### Active incident
 - fire-station marker
@@ -176,14 +180,14 @@ Routes are cached using rounded incident coordinates to avoid unnecessary repeat
 - route
 - distance
 - travel time
+- vehicle positions
 - map centered on incident
 
 ### Incident closed
 - incident marker removed
 - route removed
 - fire-station marker remains
-
-The preferred presentation is a flexible Leaflet/Home Assistant map solution rather than putting unnecessary UI logic into the backend integration.
+- vehicle positions remain available according to the API
 
 ---
 
@@ -196,118 +200,85 @@ Files:
 
 **Status: 🟡 Review required**
 
-There is currently an inconsistency between `strings.json` and `translations/de.json` regarding the fire-station address description.
-
-The German UI should clearly explain the expected format:
-
+The fire-station address description should clearly explain:
 `Straße Hausnummer, PLZ Ort`
 
 Example:
-
 `Vogelsangweg 14, 34346 Hann. Münden`
-
-Translations should remain synchronized across the supported languages.
 
 ---
 
-## 10. HACS / release
+## 10. HACS / release 1.1.2
 
-Current manifest version:
-`1.1.0`
+The manifest is prepared with version:
 
-HACS metadata is present.
+`1.1.2`
 
-Before the next release:
-- review repository metadata
-- review manifest version
-- validate HACS structure
-- update README if required
-- test installation/update
-- create commit
-- create Git tag
-- create GitHub release
+The HACS display name and Home Assistant integration name are aligned as:
+
+**DIVERA 24/7 with Server URL**
+
+Before publishing:
+- test Home Assistant startup
+- verify existing alarm sensors
+- verify vehicle sensors
+- verify vehicle trackers
+- verify WebSocket vehicle updates
+- verify route sensors
+- verify incident close behaviour
+- create Git tag `v1.1.2`
+- create GitHub release `1.1.2`
+- test HACS update
 
 ---
 
 ## 11. Development rules
 
 1. Do not change stable backend/WebSocket logic without a concrete reason.
-2. Add new sensors primarily through `sensor.py`.
-3. Keep routing separate from the DIVERA core.
-4. Change the Config Flow only when required.
+2. Keep the current route implementation; do not reintroduce the incompatible old Route Sensor approach.
+3. Add dynamic vehicle entities without changing existing alarm entity IDs.
+4. Keep vehicle status and vehicle position data read-only.
 5. Update translations together.
-6. Avoid unnecessary changes to entity IDs and unique IDs.
+6. Avoid unnecessary changes to existing unique IDs.
 7. Test Home Assistant startup/reload behaviour before releases.
 8. Test new functionality before increasing the version.
-9. Avoid broad refactoring of already working functionality.
 
 ---
 
-## 12. Next steps
-
-### Phase 1 – Repository review
-- [ ] review complete file structure
-- [ ] review all Python files
-- [ ] review Home Assistant compatibility
-- [ ] review HACS configuration
-- [ ] compare translations
-- [ ] review entity structure
-- [ ] identify potential bugs
-
-### Phase 2 – Stabilization
-- [ ] fix identified issues
-- [ ] leave stable WebSocket/backend logic untouched
-- [ ] test sensors
-- [ ] test device trackers
-- [ ] test routing
-- [ ] test incident close behaviour
-
-### Phase 3 – Map
-- [ ] decide final map solution
-- [ ] show fire station
-- [ ] show incident
-- [ ] show route
-- [ ] show distance
-- [ ] show travel time
-- [ ] center on incident
-- [ ] remove route/incident after closure
-
-### Phase 4 – Release
-- [ ] finalize README
-- [ ] finalize translations
-- [ ] increase version
-- [ ] commit
-- [ ] tag
-- [ ] GitHub release
-- [ ] HACS update test
-
----
-
-## 13. Current overall status
+## 12. Current overall status
 
 | Area | Status |
 |---|---|
 | DIVERA backend | 🟢 Stable |
 | WebSocket | 🟢 Stable |
 | Fallback polling | 🟢 Implemented |
-| Config Flow | 🟢 Functional / review pending |
+| Config Flow | 🟢 Functional |
 | Alarm sensors | 🟢 Implemented |
 | Fire station tracker | 🟢 Implemented |
 | Incident tracker | 🟢 Implemented |
-| Routing | 🟢 Implemented / practical test pending |
-| Route sensors | 🟢 Implemented |
-| Map presentation | 🟡 Technical basis available |
+| Vehicle sensors | 🟢 Implemented / HA test pending |
+| Vehicle trackers | 🟢 Implemented / HA test pending |
+| Vehicle WebSocket refresh | 🟢 Implemented |
+| Current routing | 🟢 Retained |
+| Old incompatible Route Sensor | 🔴 Not reintroduced |
+| Map presentation | 🟡 Next development step |
 | Translations | 🟡 Review required |
-| HACS / release | 🟡 Review required |
+| Release 1.1.2 | 🟡 Ready for user tag/release after testing |
+
+---
+
+## 13. Reference implementation
+
+The vehicle entity design was based on the relevant parts of `moehrem/DiveraControl`.
+
+DiveraControl documents vehicle data, vehicle positions and status as part of its APIv2 functionality. The current implementation intentionally takes only the relevant read-side vehicle functionality and does **not** copy its older route-sensor approach.
 
 ---
 
 ## 14. Guiding principle
 
-The current repository should be treated as a **working technical baseline**.
-
-The next development step is therefore a complete repository review before making further functional changes.
+The repository remains a **working technical baseline**.
 
 Priority:
 
-**Stability → bug fixing → data/sensors → routing → map → UI/translations → release**
+**Stability → alarm/vehicle data → sensor/tracker testing → routing → map → UI/translations → release**
