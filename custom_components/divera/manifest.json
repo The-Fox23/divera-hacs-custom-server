@@ -1,6 +1,6 @@
 {
   "domain": "divera",
-  "name": "DIVERA 24/7",
+  "name": "DIVERA 24/7 with Server URL",
   "version": "1.1.0",
   "config_flow": true,
   "iot_class": "cloud_polling",
