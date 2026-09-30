@@ -12,7 +12,6 @@ from .route import DiveraRouteCoordinator
 PLATFORMS = [
     "sensor",
     "device_tracker",
-    "route_sensor",
 ]
 
 
