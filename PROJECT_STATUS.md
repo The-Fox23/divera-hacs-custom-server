@@ -3,7 +3,7 @@
 
 **Repository:** `The-Fox23/divera-hacs-custom-server`  
 **Integration:** DIVERA 24/7 with Server URL  
-**Prepared manifest version:** `1.1.3`  
+**Prepared manifest version:** `1.1.4`  
 **Status:** 🟢 Vehicle status/position support implemented; practical HA test pending
 
 ---
@@ -212,11 +212,11 @@ Example:
 
 ---
 
-## 10. HACS / release 1.1.3
+## 10. HACS / release 1.1.4
 
 The manifest is prepared with version:
 
-`1.1.3`
+`1.1.4`
 
 The HACS display name and Home Assistant integration name are aligned as:
 
@@ -230,8 +230,8 @@ Before publishing:
 - verify WebSocket vehicle updates
 - verify route sensors
 - verify incident close behaviour
-- create Git tag `v1.1.3`
-- create GitHub release `1.1.3`
+- create Git tag `v1.1.4`
+- create GitHub release `1.1.4`
 - test HACS update
 
 ---
@@ -267,7 +267,8 @@ Before publishing:
 | Old incompatible Route Sensor | 🔴 Not reintroduced |
 | Map presentation | 🟡 Next development step |
 | Translations | 🟡 Review required |
-| Release 1.1.3 | 🟡 Ready for user tag/release after testing |
+| Open alarm sensor | 🟢 Implemented (0/1) / HA test pending |
+| Release 1.1.4 | 🟡 Ready for user tag/release after testing |
 
 ---
 
