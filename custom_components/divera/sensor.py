@@ -54,6 +54,7 @@ async def async_setup_entry(
     route: DiveraRouteCoordinator = hass.data[f"{DOMAIN}_route"][entry.entry_id]
     async_add_entities([
         DiveraAlarmSensor(coordinator, entry),
+        DiveraOpenAlarmSensor(coordinator, entry),
         DiveraAlarmTextSensor(coordinator, entry),
         DiveraAddressSensor(coordinator, entry),
         DiveraAlarmIdSensor(coordinator, entry),
@@ -105,6 +106,21 @@ class DiveraAlarmSensor(_Base):
         }
         attrs.update({k:v for k,v in a.items() if k not in known})
         return {k:v for k,v in attrs.items() if v is not None}
+
+
+class DiveraOpenAlarmSensor(_Base):
+    """Indicates whether an active/open alarm exists (0 or 1)."""
+
+    def __init__(self, c, e):
+        super().__init__(c, e, "offener_alarm_", "Offener Alarm")
+
+    @property
+    def native_value(self):
+        alarm = self.alarm or {}
+        if not alarm:
+            return 0
+
+        return 0 if alarm.get("closed") else 1
 
 
 class DiveraAlarmTextSensor(_Base):
