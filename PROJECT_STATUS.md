@@ -4,7 +4,7 @@
 **Repository:** `The-Fox23/divera-hacs-custom-server`  
 **Integration:** DIVERA 24/7 with Server URL  
 **Prepared manifest version:** `1.1.5`  
-**Status:** 🟢 Vehicle status/position support implemented; practical HA test pending
+**Status:** 🟢 v1.1.5 prepared; current Home Assistant platform compatibility fix applied; practical HA test pending
 
 ---
 
@@ -152,11 +152,11 @@ Provide the current API position of each DIVERA vehicle.
 
 ## 7. Routing
 
-**Status: 🟢 Existing implementation retained**
+**Status: 🟢 Existing implementation retained / current Core platform setup corrected**
 
 Routing continues to use the current `DiveraRouteCoordinator` and OSRM implementation.
 
-The newer vehicle functionality does **not** reintroduce the old Route Sensor implementation from DiveraControl.
+The newer vehicle functionality does **not** reintroduce the old Route Sensor implementation from DiveraControl. The obsolete `route_sensor` platform file was removed because current Home Assistant forwards supported platform names such as `sensor` and `device_tracker`; the route entities are provided by the existing `sensor` platform.
 
 Current routing service:
 `https://router.project-osrm.org`
@@ -228,7 +228,8 @@ Before publishing:
 - verify vehicle sensors
 - verify vehicle trackers
 - verify WebSocket vehicle updates
-- verify route sensors
+- verify route sensors via the `sensor` platform
+- verify Home Assistant startup without `route_sensor` setup errors
 - verify incident close behaviour
 - create Git tag `v1.1.5`
 - create GitHub release `1.1.5`
@@ -263,12 +264,12 @@ Before publishing:
 | Vehicle sensors | 🟢 Implemented / HA test pending |
 | Vehicle trackers | 🟢 Implemented / HA test pending |
 | Vehicle WebSocket refresh | 🟢 Implemented |
-| Current routing | 🟢 Retained |
-| Old incompatible Route Sensor | 🔴 Not reintroduced |
+| Current routing | 🟢 Retained / Core-compatible platform setup |
+| Old `route_sensor` platform | 🟢 Removed; route entities remain in `sensor` |
 | Map presentation | 🟡 Next development step |
 | Translations | 🟡 Review required |
 | Open alarm sensor | 🟢 Implemented (0/1) / HA test pending |
-| Release 1.1.5 | 🟡 Ready for user tag/release after testing |
+| Release 1.1.5 | 🟡 Ready for user tag/release after HA testing |
 
 ---
 
