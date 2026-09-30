@@ -116,8 +116,10 @@ class DiveraOpenAlarmSensor(_Base):
 
     @property
     def native_value(self):
-        alarm = self.alarm or {}
-        if not alarm:
+        alarm = self.alarm
+        # The coordinator also contains vehicle/FMS data when no alarm exists.
+        # Therefore an alarm must have a valid ID before it can be considered open.
+        if not alarm or alarm.get("id") is None:
             return 0
 
         return 0 if alarm.get("closed") else 1
